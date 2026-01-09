@@ -1,14 +1,18 @@
 #!/bin/sh
 
+################################################################################
+
 Gradle startup script for UN*X
+
+################################################################################
 
 Attempt to set APP_HOME
 
+Resolve links: $0 may be a link
+
 PRG="$0"
 
-Need this for relative symlinks.
-
-while [ -h "$PRG" ] ; do
+while [ -h "$PRG" ]; do
 ls=ls -ld "$PRG"
 link=expr "$ls" : '.*-> \(.*\)$'
 if expr "$link" : '/.*' > /dev/null; then
@@ -26,35 +30,22 @@ cd "$SAVED" >/dev/null
 APP_NAME="Gradle"
 APP_BASE_NAME=basename "$0"
 
-warn () {
-echo "$1"
-}
+Add default JVM options here.
 
-die () {
-echo
-echo "$1"
-echo
-exit 1
-}
+WICHTIG: Keine extra Anführungszeichen innerhalb der Variablen!
 
-WICHTIG: Wir reduzieren den Speicherhunger für Bitrise
-
-DEFAULT_JVM_OPTS='"-Xmx512m" "-XX:MaxMetaspaceSize=256m" "-XX:+UseParallelGC"'
+DEFAULT_JVM_OPTS="-Xmx512m -XX:MaxMetaspaceSize=256m"
 
 Determine the Java command to use to start the JVM.
 
 if [ -n "$JAVA_HOME" ] ; then
-if [ -x "$JAVA_HOME/jre/sh/java" ] ; then
-JAVACMD="$JAVA_HOME/jre/sh/java"
-else
 JAVACMD="$JAVA_HOME/bin/java"
-fi
 else
 JAVACMD="java"
 fi
 
 if [ ! -x "$JAVACMD" ] ; then
-which java >/dev/null 2>&1 || die "ERROR: JAVA_HOME is not set and no 'java' command could be found."
+which java >/dev/null 2>&1 || echo "ERROR: JAVA_HOME is not set"
 fi
 
 Collect all arguments for the java command.
@@ -63,4 +54,6 @@ CLASSPATH=$APP_HOME/gradle/wrapper/gradle-wrapper.jar
 
 Execute Gradle
 
-exec "$JAVACMD" $DEFAULT_JVM_OPTS $GRADLE_OPTS "-Dorg.gradle.appname=$APP_BASE_NAME" -classpath "$CLASSPATH" org.gradle.wrapper.GradleWrapperMain "$@"
+Hier nutzen wir die Variable OHNE zusätzliche manuelle Quotes drumherum
+
+exec "$JAVACMD" $DEFAULT_JVM_OPTS "-Dorg.gradle.appname=$APP_BASE_NAME" -classpath "$CLASSPATH" org.gradle.wrapper.GradleWrapperMain "$@"
