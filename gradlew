@@ -1,6 +1,4 @@
-#!/bin/sh
-
-Minimalistisches Gradlew ohne fehleranfällige Kommentare
+Feststellen des Programmpfads
 
 PRG="$0"
 while [ -h "$PRG" ]; do
@@ -13,7 +11,9 @@ PRG=dirname "$PRG""/$link"
 fi
 done
 
-APP_HOME=pwd -P
+Umgebungsvariablen setzen
+
+APP_HOME=pwd
 APP_BASE_NAME=basename "$0"
 CLASSPATH="$APP_HOME/gradle/wrapper/gradle-wrapper.jar"
 JAVACMD="java"
@@ -21,5 +21,7 @@ JAVACMD="java"
 if [ -n "$JAVA_HOME" ] ; then
 JAVACMD="$JAVA_HOME/bin/java"
 fi
+
+Gradle Wrapper ausführen
 
 exec "$JAVACMD" -Xmx512m "-Dorg.gradle.appname=$APP_BASE_NAME" -classpath "$CLASSPATH" org.gradle.wrapper.GradleWrapperMain "$@"
