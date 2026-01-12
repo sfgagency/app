@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SFG - Sound of Germany</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: black;
+            color: white;
+            margin: 0;
+            overflow: hidden;
+        }
+
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+        @keyframes spin-slow {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        .animate-spin-slow { animation: spin-slow 15s linear infinite; }
+
+        .snap-container {
+            scroll-snap-type: y mandatory;
+            height: calc(100vh - 112px);
+            overflow-y: scroll;
+        }
+        .snap-item {
+            scroll-snap-align: start;
+            height: 100%;
+            width: 100%;
+            position: relative;
+        }
+
+        .loader {
+            border: 3px solid rgba(255, 255, 255, 0.1);
+            border-top: 3px solid #f97316;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .status-toast {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 100;
+            transition: all 0.3s ease;
+        }
+
+        /* Modal Styles */
+        #error-modal {
+            background-color: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(8px);
+        }
+    </style>
+</head>
+<body class="max-w-md mx-auto border-x border-white/5 h-screen flex flex-col">
+
+    <!-- Status Toast -->
+    <div id="toast" class="status-toast hidden bg-gray-900 border border-white/10 px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest flex items-center gap-2">
+        <span id="toast-icon" class="w-2 h-2 rounded-full bg-orange-500"></span>
+        <span id="toast-text">Synchronisiere...</span>
+    </div>
+
+    <!-- Error Popup Modal -->
+    <div id="error-modal" class="fixed inset-0 z-[100] hidden flex items-center justify-center p-6">
+        <div class="bg-gray-900 border border-white/10 rounded-[2.5rem] p-8 w-full max-w-sm text-center shadow-2xl">
+            <div class="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
+                <i data-lucide="wifi-off" class="text-red-500 w-8 h-8"></i>
+            </div>
+            <h2 class="text-2xl font-black italic uppercase tracking-tighter mb-2">Verbindung fehlgeschlagen</h2>
+            <p class="text-gray-400 text-sm mb-8">Wir konnten keine Verbindung zur Datenbank (D1) herstellen. Bitte prüfe dein Cloudflare-Binding "DB" und den Secret Store "sfg".</p>
+            <button onclick="closeErrorModal()" class="w-full bg-white text-black py-4 rounded-2xl font-black uppercase tracking-widest active:scale-95 transition-transform">
+                Verstanden
+            </button>
+        </div>
+    </div>
+
+    <!-- Ladebildschirm -->
+    <div id="loading-screen" class="fixed inset-0 z-50 bg-black flex flex-col items-center justify-center">
+        <div class="loader mb-4"></div>
+        <p class="font-black tracking-widest uppercase text-[10px] text-orange-500">SFG x Cloudflare D1 Sync</p>
+        <p id="loading-status" class="text-[8px] text-gray-600 mt-2 uppercase tracking-tighter">Prüfe Verbindung...</p>
+    </div>
+
+    <!-- Auth Bildschirm -->
+    <div id="auth-screen" class="hidden h-full flex flex-col items-center justify-center p-8">
+        <div class="mb-12 text-center">
+            <div class="w-24 h-24 bg-gradient-to-br from-orange-600 to-red-500 rounded-3xl flex items-center justify-center shadow-2xl shadow-orange-500/20 mx-auto mb-6">
+                <i data-lucide="radio" class="w-12 h-12 text-black"></i>
+            </div>
+            <h1 class="text-5xl font-black italic tracking-tighter">SFG</h1>
+            <p class="text-orange-500 text-[10px] font-bold tracking-[0.5em] uppercase mt-2">Sound of Germany</p>
+        </div>
+
+        <form id="auth-form" class="w-full max-w-sm space-y-4">
+            <div id="username-container" class="relative hidden">
+                <i data-lucide="user" class="absolute left-4 top-4 text-gray-500 w-5 h-5"></i>
+                <input id="auth-username" class="w-full bg-gray-900 border border-gray-800 p-4 pl-12 rounded-2xl outline-none focus:border-orange-500 transition-all text-white" placeholder="Künstlername">
+            </div>
+            <div class="relative">
+                <i data-lucide="mail" class="absolute left-4 top-4 text-gray-500 w-5 h-5"></i>
+                <input id="auth-email" type="email" class="w-full bg-gray-900 border border-gray-800 p-4 pl-12 rounded-2xl outline-none focus:border-orange-500 transition-all text-white" placeholder="E-Mail" required>
+            </div>
+            <div class="relative">
+                <i data-lucide="lock" class="absolute left-4 top-4 text-gray-500 w-5 h-5"></i>
+                <input id="auth-password" type="password" class="w-full bg-gray-900 border border-gray-800 p-4 pl-12 rounded-2xl outline-none focus:border-orange-500 transition-all text-white" placeholder="Passwort" required>
+            </div>
+            <button type="submit" id="auth-submit" class="w-full bg-orange-500 text-black p-5 rounded-2xl font-black text-xl active:scale-95 transition-transform shadow-xl shadow-orange-500/20">
+                LOGIN
+            </button>
+        </form>
+
+        <button id="toggle-auth" class="mt-10 text-gray-500 text-xs font-bold uppercase tracking-widest">
+            Account erstellen
+        </button>
+    </div>
+
+    <!-- Hauptinhalt -->
+    <div id="app-content" class="hidden flex-1 flex flex-col overflow-hidden">
+        
+        <div id="tab-home" class="tab-pane flex-1 overflow-hidden">
+            <div id="feed-container" class="snap-container scrollbar-hide"></div>
+        </div>
+
+        <div id="tab-search" class="tab-pane hidden p-6 space-y-6 overflow-y-auto">
+            <h2 class="text-3xl font-black italic tracking-tighter uppercase">Entdecken</h2>
+            <div class="relative">
+                <i data-lucide="search" class="absolute left-4 top-4 text-gray-500 w-5 h-5"></i>
+                <input id="search-input" class="w-full bg-gray-900 border border-gray-800 p-4 pl-12 rounded-2xl outline-none focus:border-orange-500 transition-all" placeholder="Suche...">
+            </div>
+            <div id="search-results" class="space-y-4"></div>
+        </div>
+
+        <div id="tab-upload" class="tab-pane hidden p-8 space-y-6 overflow-y-auto">
+            <h2 class="text-4xl font-black italic tracking-tighter uppercase text-orange-500">Posten</h2>
+            <input id="upload-title" class="w-full bg-gray-900 p-5 rounded-2xl outline-none border border-gray-800 focus:border-orange-500 text-white" placeholder="Song Name">
+            <textarea id="upload-desc" class="w-full bg-gray-900 p-5 rounded-2xl outline-none border border-gray-800 h-28 resize-none focus:border-orange-500 text-white" placeholder="Beschreibung"></textarea>
+            <button id="submit-upload" class="w-full bg-orange-500 text-black py-5 rounded-2xl font-black text-lg">POSTEN</button>
+        </div>
+
+        <div id="tab-inbox" class="tab-pane hidden p-6 space-y-6 overflow-y-auto">
+            <h2 class="text-3xl font-black italic tracking-tighter uppercase">Inbox</h2>
+            <div id="inbox-list" class="space-y-4"></div>
+        </div>
+
+        <div id="tab-profile" class="tab-pane hidden p-8 text-center overflow-y-auto">
+            <div class="relative w-32 h-32 mx-auto mb-6">
+                <div class="w-full h-full rounded-[2.5rem] bg-gray-900 flex items-center justify-center border-2 border-orange-500 overflow-hidden">
+                    <img id="profile-img" src="" class="w-full h-full object-cover">
+                </div>
+            </div>
+            <h2 id="profile-name" class="text-3xl font-black italic tracking-tighter uppercase">@username</h2>
+            <p id="profile-badge-text" class="text-orange-500 text-[10px] font-black mt-2 tracking-widest uppercase bg-orange-500/10 px-4 py-1 rounded-full inline-block">Artist</p>
+            <button id="logout-btn" class="mt-20 text-gray-600 uppercase text-[10px] font-black tracking-widest">Logout</button>
+        </div>
+
+        <div class="h-28 bg-black/90 backdrop-blur-xl border-t border-white/5 flex items-center justify-around px-8 pb-8 pt-2">
+            <button class="nav-btn text-orange-500" data-tab="home"><i data-lucide="home"></i></button>
+            <button class="nav-btn text-gray-600" data-tab="search"><i data-lucide="search"></i></button>
+            <button class="bg-orange-500 p-4 rounded-2xl -mt-10 nav-btn" data-tab="upload"><i data-lucide="plus" class="text-black"></i></button>
+            <button class="nav-btn text-gray-600" data-tab="inbox"><i data-lucide="mail"></i></button>
+            <button class="nav-btn text-gray-600" data-tab="profile"><i data-lucide="user"></i></button>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * CLOUDFLARE CONFIGURATION (REFERENCE ONLY)
+         * Secret Store ID: a1d4fc9d1cec4923829327ef1b985b46
+         * Secret Name: sfg
+         */
+        const API_URL = 'https://sfg.j-gutschein2.workers.dev';
+        const VERIFIED_EMAILS = ['info@sfg.de', 'ryanjamie.herrmann@gmail.com'];
+        
+        let currentUser = JSON.parse(localStorage.getItem('sfg_cf_user'));
+        let posts = JSON.parse(localStorage.getItem('sfg_cf_posts') || '[]');
+        let authMode = 'login';
+        let dbConnectionFailed = false;
+
+        function showToast(text, color = 'orange-500') {
+            const toast = document.getElementById('toast');
+            document.getElementById('toast-text').innerText = text;
+            document.getElementById('toast-icon').className = `w-2 h-2 rounded-full bg-${color}`;
+            toast.classList.remove('hidden');
+            setTimeout(() => toast.classList.add('hidden'), 3000);
+        }
+
+        function showErrorModal() {
+            document.getElementById('error-modal').classList.remove('hidden');
+        }
+
+        function closeErrorModal() {
+            document.getElementById('error-modal').classList.add('hidden');
+        }
+
+        function showLoading(show) {
+            document.getElementById('loading-screen').classList.toggle('hidden', !show);
+        }
+
+        window.addEventListener('DOMContentLoaded', async () => {
+            lucide.createIcons();
+            
+            const timeout = setTimeout(() => {
+                if (!dbConnectionFailed) {
+                    console.log("Sync Timeout - Lade Offline Modus");
+                    dbConnectionFailed = true;
+                    showErrorModal();
+                    if (currentUser) showApp(); else showAuth();
+                }
+            }, 4000);
+
+            try {
+                if (currentUser) {
+                    const success = await syncUserWithDB();
+                    if (!success && !dbConnectionFailed) {
+                        dbConnectionFailed = true;
+                        showErrorModal();
+                    }
+                    showApp();
+                } else {
+                    showAuth();
+                }
+                await fetchPosts();
+            } catch (e) {
+                if (!dbConnectionFailed) {
+                    dbConnectionFailed = true;
+                    showErrorModal();
+                }
+            }
+            
+            clearTimeout(timeout);
+        });
+
+        async function syncUserWithDB() {
+            if (!currentUser || !currentUser.email) return false;
+            document.getElementById('loading-status').innerText = "Abgleich mit D1 (Binding: DB / Secret: sfg)...";
+
+            try {
+                const controller = new AbortController();
+                const id = setTimeout(() => controller.abort(), 3000);
+
+                const response = await fetch(`${API_URL}/api/user?email=${encodeURIComponent(currentUser.email)}`, { 
+                    signal: controller.signal 
+                });
+                clearTimeout(id);
+
+                if (response.ok) {
+                    const dbUser = await response.json();
+                    currentUser = {
+                        ...currentUser,
+                        username: dbUser.username || currentUser.username,
+                        isVerified: dbUser.is_verified || VERIFIED_EMAILS.includes(currentUser.email.toLowerCase()),
+                        uid: dbUser.id || currentUser.uid
+                    };
+                    localStorage.setItem('sfg_cf_user', JSON.stringify(currentUser));
+                    showToast("Cloud Sync aktiv", "green-500");
+                    return true;
+                }
+                return false;
+            } catch (err) {
+                console.warn("D1 nicht erreichbar");
+                showToast("Lokaler Modus", "yellow-500");
+                return false;
+            }
+        }
+
+        async function fetchPosts() {
+            try {
+                const response = await fetch(`${API_URL}/api/posts`);
+                if (response.ok) {
+                    const remotePosts = await response.json();
+                    if(remotePosts && remotePosts.length > 0) {
+                        posts = remotePosts;
+                        localStorage.setItem('sfg_cf_posts', JSON.stringify(posts));
+                    }
+                }
+            } catch (err) { console.log("Posts konnten nicht geladen werden"); }
+            renderFeed();
+        }
+
+        function renderFeed() {
+            const container = document.getElementById('feed-container');
+            if (!posts.length) {
+                container.innerHTML = `<div class="h-full flex items-center justify-center opacity-20"><p class="font-black uppercase tracking-widest text-center px-10">Keine Tracks<br><span class="text-[8px] italic tracking-normal font-normal">Prüfe D1 Binding & Secrets...</span></p></div>`;
+                return;
+            }
+            container.innerHTML = posts.map(post => `
+                <div class="snap-item flex flex-col justify-end p-8 bg-gradient-to-t from-black via-transparent to-orange-900/10">
+                    <div class="absolute inset-0 -z-10 bg-gray-900 flex items-center justify-center">
+                        <i data-lucide="disc" class="w-48 h-48 text-white/5 animate-spin-slow"></i>
+                    </div>
+                    <div class="space-y-4">
+                        <h3 class="text-3xl font-black italic tracking-tighter">@${post.username}</h3>
+                        <p class="text-sm text-gray-400">${post.description || ''}</p>
+                        <div class="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/10 flex items-center gap-3">
+                            <i data-lucide="music" class="text-orange-500"></i>
+                            <span class="font-bold text-xs uppercase tracking-widest">${post.songTitle}</span>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+            lucide.createIcons();
+        }
+
+        document.getElementById('auth-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('auth-email').value;
+            const password = document.getElementById('auth-password').value;
+            const username = document.getElementById('auth-username').value;
+
+            showLoading(true);
+            try {
+                const endpoint = authMode === 'register' ? '/api/register' : '/api/login';
+                const res = await fetch(`${API_URL}${endpoint}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password, username })
+                });
+                if (res.ok) currentUser = await res.json();
+                else throw new Error();
+            } catch (err) {
+                currentUser = { uid: 'u_'+Date.now(), email, username: username || email.split('@')[0], isVerified: VERIFIED_EMAILS.includes(email.toLowerCase()) };
+                showErrorModal();
+            }
+            localStorage.setItem('sfg_cf_user', JSON.stringify(currentUser));
+            showApp();
+        });
+
+        document.getElementById('toggle-auth').addEventListener('click', () => {
+            authMode = authMode === 'login' ? 'register' : 'login';
+            document.getElementById('username-container').classList.toggle('hidden', authMode === 'login');
+            document.getElementById('auth-submit').innerText = authMode === 'login' ? 'LOGIN' : 'ACCOUNT ERSTELLEN';
+            document.getElementById('toggle-auth').innerText = authMode === 'login' ? 'Account erstellen' : 'Zum Login';
+        });
+
+        function showAuth() { showLoading(false); document.getElementById('auth-screen').classList.remove('hidden'); document.getElementById('app-content').classList.add('hidden'); }
+        function showApp() { 
+            showLoading(false); 
+            document.getElementById('auth-screen').classList.add('hidden'); 
+            document.getElementById('app-content').classList.remove('hidden'); 
+            updateProfileUI();
+        }
+
+        function updateProfileUI() {
+            if(!currentUser) return;
+            document.getElementById('profile-img').src = `https://api.dicebear.com/7.x/avataaars/svg?seed=${currentUser.username}`;
+            document.getElementById('profile-name').innerText = `@${currentUser.username}`;
+            document.getElementById('profile-badge-text').innerText = currentUser.isVerified ? 'Verified Artist' : 'Artist';
+            lucide.createIcons();
+        }
+
+        document.getElementById('logout-btn').addEventListener('click', () => { localStorage.clear(); location.reload(); });
+        document.querySelectorAll('.nav-btn').forEach(btn => btn.addEventListener('click', () => switchTab(btn.dataset.tab)));
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-pane').forEach(p => p.classList.add('hidden'));
+            document.getElementById(`tab-${tabId}`).classList.remove('hidden');
+            document.querySelectorAll('.nav-btn').forEach(b => b.classList.replace('text-orange-500', 'text-gray-600'));
+            const active = document.querySelector(`[data-tab="${tabId}"]`);
+            if(active) active.classList.replace('text-gray-600', 'text-orange-500');
+        }
+    </script>
+</body>
+</html>
